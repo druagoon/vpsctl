@@ -1,0 +1,51 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  build-and-release:
+    name: "Build and Release"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install `shinc` for building binaries
+        uses: sigoden/install-binary@v1
+        with:
+          repo: druagoon/shinc-rs
+          name: shinc
+
+      - name: Install `shfmt` for formatting shell scripts
+        uses: sigoden/install-binary@v1
+        with:
+          repo: mvdan/sh
+          tag: v3.11.0
+          name: shfmt
+
+      - name: Clean up
+        run: shinc clean
+
+      - name: Compile and build binaries
+        run: shinc build
+
+      - name: Generate man pages
+        run: shinc man
+
+      - name: Generate shell completions
+        run: shinc completions
+
+      - name: Distribute binaries
+        run: shinc dist
+
+      - name: Release
+        uses: docker://antonyurchenko/git-release:v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: target/dist/*

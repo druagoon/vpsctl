@@ -1,0 +1,7 @@
+[project]
+name = "vpsctl"
+version = "1.0.0"
+description = "Set up a VPS with basic security and configuration"
+homepage = "https://github.com/druagoon/vpsctl"
+repository = "https://github.com/druagoon/vpsctl"
+license = "MIT"
