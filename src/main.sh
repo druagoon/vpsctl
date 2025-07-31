@@ -21,4 +21,15 @@ set -o pipefail
 # @include lib/std/path.sh
 # @include lib/std/tips.sh
 
+# @include lib/local/utils.sh
+
+# @include commands/certbot.sh
+# @include commands/fail2ban.sh
+# @include commands/firewall.sh
+# @include commands/gost.sh
+# @include commands/ssh-guard.sh
+# @include commands/ssh.sh
+# @include commands/system.sh
+# @include commands/user.sh
+
 # @include hooks.sh
