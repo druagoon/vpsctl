@@ -16,6 +16,7 @@ system() {
         curl \
         gawk \
         git \
+        ipset \
         jq \
         vim \
         htop \
