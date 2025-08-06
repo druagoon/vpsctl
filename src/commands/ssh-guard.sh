@@ -20,6 +20,7 @@ ssh-guard() {
     fi
     local threshold="${argc_threshold:-3}"
     local whitelist_file="${argc_whitelist_file:-/opt/vpsctl/etc/ssh-guard/whitelist.txt}"
+    local time_now="$(date --rfc-3339=seconds | sed 's/ /T/')"
 
     local -a opts=()
     local is_all="${argc_all:-0}"
@@ -31,17 +32,6 @@ ssh-guard() {
             opts+=("--until" "${until}")
         fi
     fi
-
-    local log_dir="$(dirname "${log_file}")"
-    if [[ ! -d "${log_dir}" ]]; then
-        mkdir -p "${log_dir}"
-    fi
-    local whitelist_dir="$(dirname "${whitelist_file}")"
-    if [[ ! -d "${whitelist_dir}" ]]; then
-        mkdir -p "${whitelist_dir}"
-    fi
-
-    local time_now="$(date --rfc-3339=seconds | sed 's/ /T/')"
 
     # 1. Collect all IPs that appeared in SSH logs (all types of logs)
     local all_ips="$(journalctl -u ssh "${opts[@]}" | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
@@ -65,6 +55,7 @@ ssh-guard() {
     local bad_ips="$(echo "${filtered_ips}" | sort | uniq -c | sort -nr | awk -v threshold="${threshold}" '$1 >= threshold {print $2, $1}')"
 
     # 6. Blocking logic
+    std::path::file::ensure_dir "${log_file}"
     while read -r ip count; do
         if [ -z "${ip}" ]; then continue; fi
 

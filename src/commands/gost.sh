@@ -16,11 +16,8 @@ gost() {
     local web_password="${argc_web_password:-}"
     local socks_password="${argc_socks_password:-}"
 
-    if [[ -d /opt/gost/etc ]]; then
-        mkdir -p /opt/gost/etc
-    fi
-
     std::tips::title "Creating gost configuration"
+    std::path::dir::ensure /opt/gost/etc
     local gost_config="/opt/gost/etc/gost.yaml"
     cat >"${gost_config}" <<EOF
 services:
