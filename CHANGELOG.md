@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-09-04
+
+### Fixed
+
+- *(firewall)* Update URLs for geoip-cn-blacklist sets ([76b52a0](https://github.com/druagoon/vpsctl/commit/76b52a09ea589583418efebd3e7b953d74bb589e))
+
 ## [1.1.0] - 2025-08-29
 
 ### Added
@@ -21,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add command scripts for server setup and security configuration ([cdf20f3](https://github.com/druagoon/vpsctl/commit/cdf20f3f609d51e74797389d721960fda9fe02e6))
 
+[1.1.1]: https://github.com/druagoon/vpsctl/compare/v1.1.0..v1.1.1
 [1.1.0]: https://github.com/druagoon/vpsctl/compare/v1.0.0..v1.1.0
 [1.0.0]: https://github.com/druagoon/vpsctl/releases/tag/v1.0.0
 
