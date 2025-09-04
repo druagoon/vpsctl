@@ -43,8 +43,8 @@ firewall() {
     local -A ip_sets=(
         ["geoip-cn-v4"]="https://github.com/druagoon/geoip2cn/raw/download/countries/ipv4/cn.zone"
         ["geoip-cn-v6"]="https://github.com/druagoon/geoip2cn/raw/download/countries/ipv6/cn.zone"
-        ["geoip-cn-blacklist-v4"]="https://github.com/druagoon/geoip2cn/raw/download/domains/ipv4/aggregated.zone"
-        ["geoip-cn-blacklist-v6"]="https://github.com/druagoon/geoip2cn/raw/download/domains/ipv6/aggregated.zone"
+        ["geoip-cn-blacklist-v4"]="https://github.com/druagoon/geoip2cn/raw/download/aggregated/ipv4.zone"
+        ["geoip-cn-blacklist-v6"]="https://github.com/druagoon/geoip2cn/raw/download/aggregated/ipv6.zone"
     )
 
     for name in "${!ip_sets[@]}"; do
