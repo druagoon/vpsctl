@@ -18,20 +18,27 @@ vpsctl_firewall_create_sets() {
         exit 1
     fi
 
-    local family
+    local family hashsize maxelem
     if vpsctl_firewall_is_ipv4_sets "${name}"; then
         family="inet"
+        hashsize="32768"
+        maxelem="65536"
     elif vpsctl_firewall_is_ipv6_sets "${name}"; then
         family="inet6"
+        hashsize="65536"
+        maxelem="131072"
     else
         error "Invalid ipset name: ${name}. Needs to end with -v4 or -v6."
         exit 1
     fi
 
     # ipset destroy "${name}" 2>/dev/null || true
-    ipset create "${name}" hash:net family ${family} -exist
-    ipset flush "${name}"
-    curl -fsSL "${url}" | sed "s/^/add ${name} /" | ipset restore
+    local tmp_name="${name}_new"
+    ipset create "${tmp_name}" hash:net family ${family} hashsize ${hashsize} maxelem ${maxelem}
+    ipset flush "${tmp_name}"
+    curl -fsSL "${url}" | sed "s/^/add ${tmp_name} /" | ipset restore
+    ipset swap "${name}" "${tmp_name}"
+    ipset destroy "${tmp_name}"
 }
 
 # @cmd Setup the UFW firewall
@@ -129,10 +136,18 @@ EOF
         fi
     done
 
-    std::tips::title "Checking and enabling UFW IPv6 support"
+    std::tips::title "Disabling IPv6 system-wide"
+    tee /etc/sysctl.d/999-ipv6.conf <<'EOF'
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+EOF
+    sysctl --system
+
+    std::tips::title "Checking and disabling UFW IPv6 support"
     local ufw_default_conf="/etc/default/ufw"
-    if grep -qx -- "IPV6=no" "${ufw_default_conf}"; then
-        sed -i 's/^IPV6=no/IPV6=yes/' "${ufw_default_conf}"
+    if grep -qx -- "IPV6=yes" "${ufw_default_conf}"; then
+        sed -i 's/^IPV6=yes/IPV6=no/' "${ufw_default_conf}"
     fi
 
     std::tips::title "Configuring UFW default rules"
