@@ -21,6 +21,7 @@ fail2ban() {
         cat >"${jail_local}" <<EOF
 [DEFAULT]
 ignoreip = ${ignore_ips}
+banaction = nftables-multiport
 EOF
     else
         warn "Fail2Ban local configuration already exists at ${jail_local}"

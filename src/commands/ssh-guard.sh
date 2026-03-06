@@ -76,7 +76,7 @@ ssh-guard() {
             if std::bool::is_true "${dry_run}"; then
                 echo "${line}"
             else
-                ufw deny from "${ip}" comment "ssh-guard: auto-block ${count} hits"
+                nft add element inet vps blocked_ips "{ ${ip} }"
                 echo "${line}" | tee -a "${log_file}"
             fi
         else

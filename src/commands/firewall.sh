@@ -1,173 +1,113 @@
-vpsctl_firewall_is_ipv4_sets() {
-    [[ "$1" == *-v4 ]]
-}
+vpsctl_firewall_download_nftables_conf() {
+    local url="${VPSCTL_FIREWALL_CONFIG_URL:-https://raw.githubusercontent.com/druagoon/geoip2cn/download/nftables.conf}"
+    local target_file="$1"
 
-vpsctl_firewall_is_ipv6_sets() {
-    [[ "$1" == *-v6 ]]
-}
-
-vpsctl_firewall_is_blacklist_sets() {
-    [[ "$1" == *-blacklist-v4 || "$1" == *-blacklist-v6 ]]
-}
-
-vpsctl_firewall_create_sets() {
-    local name="$1"
-    local url="$2"
-    if [[ -z "${name}" || -z "${url}" ]]; then
-        error "Missing name or url"
-        exit 1
+    if [[ -z "${target_file}" ]]; then
+        error "Missing target file"
+        return 1
     fi
 
-    local family hashsize maxelem
-    if vpsctl_firewall_is_ipv4_sets "${name}"; then
-        family="inet"
-        hashsize="32768"
-        maxelem="65536"
-    elif vpsctl_firewall_is_ipv6_sets "${name}"; then
-        family="inet6"
-        hashsize="65536"
-        maxelem="131072"
-    else
-        error "Invalid ipset name: ${name}. Needs to end with -v4 or -v6."
-        exit 1
+    std::tips::title "Downloading remote nftables.conf"
+    if ! curl -fsSL "${url}" -o "${target_file}"; then
+        error "Failed to download nftables config from ${url}"
+        return 1
     fi
 
-    # ipset destroy "${name}" 2>/dev/null || true
-    local tmp_name="${name}_new"
-    ipset create "${tmp_name}" hash:net family ${family} hashsize ${hashsize} maxelem ${maxelem}
-    ipset flush "${tmp_name}"
-    curl -fsSL "${url}" | sed "s/^/add ${tmp_name} /" | ipset restore
-    ipset swap "${name}" "${tmp_name}"
-    ipset destroy "${tmp_name}"
+    if [[ ! -s "${target_file}" ]]; then
+        error "Downloaded nftables config is empty"
+        return 1
+    fi
+
+    std::tips::title "Validating nftables.conf"
+    if ! nft -c -f "${target_file}" >/dev/null 2>&1; then
+        error "Downloaded nftables config failed nft validation"
+        return 1
+    fi
 }
 
-# @cmd Setup the UFW firewall
-# @meta require-tools ufw,ipset
-# @flag    --only-update-ipset-sets                 Only update ipset sets, do not modify UFW rules
+vpsctl_firewall_install_nftables_conf() {
+    local tmp_file
+    tmp_file="$(mktemp /tmp/vpsctl-nftables.XXXXXX.conf)" || {
+        error "Failed to create temporary file"
+        return 1
+    }
+
+    if ! vpsctl_firewall_download_nftables_conf "${tmp_file}"; then
+        rm -f "${tmp_file}"
+        return 1
+    fi
+
+    std::tips::title "Installing /etc/nftables.conf"
+    if ! cp "${tmp_file}" /etc/nftables.conf; then
+        rm -f "${tmp_file}"
+        error "Failed to write /etc/nftables.conf"
+        return 1
+    fi
+
+    rm -f "${tmp_file}"
+}
+
+vpsctl_firewall_apply_nftables_conf() {
+    std::tips::title "Applying nftables rules"
+    if ! nft -f /etc/nftables.conf; then
+        error "Failed to apply /etc/nftables.conf"
+        return 1
+    fi
+
+    if ! nft list set inet vps blocked_ips >/dev/null 2>&1; then
+        error "Remote nftables config must define inet vps blocked_ips for ssh-guard"
+        return 1
+    fi
+}
+
+# @cmd Setup the nftables firewall
+# @meta require-tools nft,curl
+# @flag    --refresh-config                   Refresh /etc/nftables.conf from remote source
 firewall() {
-    std::tips::info "Setting up UFW firewall"
+    std::tips::info "Setting up nftables firewall"
 
-    local -A ip_sets=(
-        ["geoip-cn-v4"]="https://github.com/druagoon/geoip2cn/raw/download/countries/ipv4/cn.zone"
-        ["geoip-cn-v6"]="https://github.com/druagoon/geoip2cn/raw/download/countries/ipv6/cn.zone"
-        ["geoip-cn-blacklist-v4"]="https://github.com/druagoon/geoip2cn/raw/download/aggregated/ipv4.zone"
-        ["geoip-cn-blacklist-v6"]="https://github.com/druagoon/geoip2cn/raw/download/aggregated/ipv6.zone"
-    )
-
-    for name in "${!ip_sets[@]}"; do
-        std::tips::title "Creating ipset sets $(std::color::green ${name})"
-        vpsctl_firewall_create_sets "${name}" "${ip_sets[${name}]}"
-    done
-
-    std::path::dir::ensure /etc/ipset/sets
-    local ipset_save_file="/etc/ipset/sets/cn.conf"
-    std::tips::title "Saving ipset sets to ${ipset_save_file}"
-    ipset save >"${ipset_save_file}"
-
-    if std::bool::is_true "${argc_only_update_ipset_sets:-0}"; then
-        warn "Only updating ipset sets, skipping UFW rules and service creation."
+    if [[ "${argc_refresh_config:-0}" == "1" ]]; then
+        if ! vpsctl_firewall_install_nftables_conf; then
+            return 1
+        fi
+        if ! vpsctl_firewall_apply_nftables_conf; then
+            return 1
+        fi
+        systemctl reload-or-restart nftables
+        std::tips::info "Remote nftables.conf refreshed"
         exit 0
     fi
 
-    std::tips::title "Setting up automatic ipset sets update"
-    local cron_job="0 2 * * * /usr/local/bin/vpsctl firewall --only-update-ipset-sets &>>/tmp/vpsctl-firewall-cron.log"
-    if crontab -l 2>/dev/null | grep -qxF "${cron_job}"; then
-        warn "Update ipset sets job already exists in crontab"
-    else
+    # 1. Download, validate, and install nftables configuration
+    if ! vpsctl_firewall_install_nftables_conf; then
+        return 1
+    fi
+
+    # 2. Apply initial configuration
+    if ! vpsctl_firewall_apply_nftables_conf; then
+        return 1
+    fi
+
+    # 3. Enable and start nftables service
+    std::tips::title "Enabling and starting nftables service"
+    systemctl enable nftables
+    systemctl restart nftables
+
+    # 4. Setup cron job for updates
+    std::tips::title "Setting up automatic nftables refresh"
+    local cron_job="0 2 * * * /usr/local/bin/vpsctl firewall --refresh-config &>>/tmp/vpsctl-firewall-cron.log"
+    # Remove old cron job if it exists
+    crontab -l 2>/dev/null | grep -v "vpsctl firewall --refresh-config" | crontab -
+    # Add new cron job
+    if ! crontab -l 2>/dev/null | grep -qxF "${cron_job}"; then
         (
             crontab -l 2>/dev/null
             echo "${cron_job}"
         ) | crontab -
-        echo "Update ipset sets job added to crontab"
-    fi
-    std::tips::title "Current crontab entries"
-    crontab -l
-
-    std::tips::title "Creating systemd service for ipset-restore"
-    std::path::dir::ensure /etc/ipset/services
-    local ipset_restore_service="/etc/ipset/services/ipset-restore.service"
-    cat >"${ipset_restore_service}" <<EOF
-[Unit]
-Description=Restore ipset sets
-Before=network-pre.target
-Wants=network-pre.target
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/sbin/ipset restore <${ipset_save_file}
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    std::tips::title "Linking systemd service for ipset-restore"
-    systemctl link "${ipset_restore_service}"
-
-    std::tips::title "Enabling and restarting ipset-restore service"
-    systemctl daemon-reload
-    systemctl enable ipset-restore.service
-    # systemctl restart ipset-restore.service
-
-    local ufw_ipv4_before_rules="/etc/ufw/before.rules"
-    local ufw_ipv4_before_input="ufw-before-input"
-    local ufw_ipv6_before_rules="/etc/ufw/before6.rules"
-    local ufw_ipv6_before_input="ufw6-before-input"
-    std::tips::title "Adding ipset rules to UFW"
-    for name in "${!ip_sets[@]}"; do
-        if vpsctl_firewall_is_ipv4_sets "${name}"; then
-            local ufw_before_input="${ufw_ipv4_before_input}"
-            local ufw_before_rules="${ufw_ipv4_before_rules}"
-        else
-            local ufw_before_input="${ufw_ipv6_before_input}"
-            local ufw_before_rules="${ufw_ipv6_before_rules}"
-        fi
-        if vpsctl_firewall_is_blacklist_sets "${name}"; then
-            local rule="-A ${ufw_before_input} -m set --match-set ${name} src -j DROP"
-        else
-            local rule="-A ${ufw_before_input} -m set ! --match-set ${name} src -j DROP"
-        fi
-        if ! grep -qxF -- "${rule}" "${ufw_before_rules}"; then
-            sed -i "/^COMMIT/i ${rule}" "${ufw_before_rules}"
-            echo "The rule '${rule}' added to ${ufw_before_rules}"
-        else
-            warn "The rule '${rule}' already exist in ${ufw_before_rules}, skipping insertion."
-        fi
-    done
-
-    std::tips::title "Disabling IPv6 system-wide"
-    tee /etc/sysctl.d/999-ipv6.conf <<'EOF'
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1
-EOF
-    sysctl --system
-
-    std::tips::title "Checking and disabling UFW IPv6 support"
-    local ufw_default_conf="/etc/default/ufw"
-    if grep -qx -- "IPV6=yes" "${ufw_default_conf}"; then
-        sed -i 's/^IPV6=yes/IPV6=no/' "${ufw_default_conf}"
+        echo "Update job added to crontab"
     fi
 
-    std::tips::title "Configuring UFW default rules"
-    ufw default deny incoming
-    ufw default allow outgoing
-
-    std::tips::title "Allowing http(s) && ssh services"
-    ufw allow http
-    ufw allow https
-    # ufw allow ssh
-    ufw allow 9443/tcp
-    ufw allow 9922/tcp
-
-    std::tips::title "Enabling UFW"
-    ufw enable
-
-    std::tips::title "Restarting UFW service to apply changes"
-    systemctl restart ufw
-
-    std::tips::title "Checking UFW status"
-    sleep 2
-    ufw status verbose
+    std::tips::title "Checking nftables status"
+    nft list ruleset | head -n 20
+    systemctl status nftables --no-pager
 }

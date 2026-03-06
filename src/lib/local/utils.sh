@@ -30,7 +30,7 @@ error() {
 }
 
 #######################################
-# Check if an IP address is denied by UFW.
+# Check if an IP address is denied by nftables.
 # Arguments:
 #   $1: IP address to check.
 # Returns:
@@ -38,7 +38,7 @@ error() {
 #######################################
 is_ip_denied() {
     local ip="$1"
-    ufw status | awk -v ip="${ip}" '$2 == "DENY" && $3 == ip' | grep -q .
+    nft list set inet vps blocked_ips 2>/dev/null | grep -q "${ip}"
 }
 
 #######################################

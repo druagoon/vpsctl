@@ -16,11 +16,10 @@ system() {
         curl \
         gawk \
         git \
-        ipset \
         jq \
         vim \
         htop \
-        ufw \
+        nftables \
         fail2ban \
         sudo
     echo "Packages installed successfully."

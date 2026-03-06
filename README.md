@@ -37,6 +37,7 @@ curl -fsSL https://github.com/druagoon/vpsctl/raw/master/install.sh | bash -s --
 
 - `vpsctl --help` to list all commands.
 - `vpsctl <command> --help` to see more help about the command.
+- `vpsctl firewall --refresh-config` to download and re-apply the remote `nftables.conf`.
 
 ## Examples
 
@@ -47,6 +48,7 @@ vpsctl system
 vpsctl user --sudo [name]
 vpsctl ssh
 vpsctl firewall
+vpsctl firewall --refresh-config
 vpsctl fail2ban --restart
 vpsctl certbot --domain=www.example.com
 vpsctl gost --domain=www.example.com --web-password=123456 --socks-password=123456
@@ -57,6 +59,14 @@ vpsctl gost --domain=www.example.com --web-password=123456 --socks-password=1234
 ### Dependencies
 
 - [shinc](https://github.com/druagoon/shinc-rs)
+
+### Build
+
+Source files live under `src/`. Generated distributable scripts under `target/` are produced by `shinc build`.
+
+```shell
+shinc build
+```
 
 ### Release
 
