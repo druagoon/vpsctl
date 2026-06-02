@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-02
+
+### Added
+
+- *(firewall)* Migrate from ufw/ipset to nftables ([038e17b](https://github.com/druagoon/vpsctl/commit/038e17b7c0e87040244c5ad5a46559e74d0d7202))
+
+### Fixed
+
+- *(firewall)* Enhance ipset creation with hashsize and maxelem, disable IPv6 support ([6f8fbcd](https://github.com/druagoon/vpsctl/commit/6f8fbcde4a151805db9dafc5d0c2901c3643a9bf))
+
 ## [1.1.1] - 2025-09-04
 
 ### Fixed
@@ -27,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add command scripts for server setup and security configuration ([cdf20f3](https://github.com/druagoon/vpsctl/commit/cdf20f3f609d51e74797389d721960fda9fe02e6))
 
+[1.2.0]: https://github.com/druagoon/vpsctl/compare/v1.1.1..v1.2.0
 [1.1.1]: https://github.com/druagoon/vpsctl/compare/v1.1.0..v1.1.1
 [1.1.0]: https://github.com/druagoon/vpsctl/compare/v1.0.0..v1.1.0
 [1.0.0]: https://github.com/druagoon/vpsctl/releases/tag/v1.0.0
