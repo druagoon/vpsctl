@@ -13,7 +13,7 @@ jobs:
     name: "Build and Release"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install `shinc` for building binaries
         uses: sigoden/install-binary@v1
@@ -25,7 +25,7 @@ jobs:
         uses: sigoden/install-binary@v1
         with:
           repo: mvdan/sh
-          tag: v3.11.0
+          tag: v3.13.0
           name: shfmt
 
       - name: Clean up
