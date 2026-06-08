@@ -19,7 +19,7 @@ vpsctl_firewall_download_nftables_conf() {
     fi
 
     std::tips::title "Validating nftables.conf"
-    if ! nft -c -f "${target_file}" >/dev/null 2>&1; then
+    if ! nft -c -f "${target_file}" >/dev/null; then
         error "Downloaded nftables config failed nft validation"
         return 1
     fi
@@ -47,10 +47,10 @@ vpsctl_firewall_install_nftables_conf() {
     rm -f "${tmp_file}"
 }
 
-vpsctl_firewall_apply_nftables_conf() {
-    std::tips::title "Applying nftables rules"
-    if ! nft -f /etc/nftables.conf; then
-        error "Failed to apply /etc/nftables.conf"
+vpsctl_firewall_reload_nftables() {
+    std::tips::title "Reloading nftables service"
+    if ! systemctl reload-or-restart nftables; then
+        error "Failed to reload-or-restart nftables"
         return 1
     fi
 
@@ -70,10 +70,9 @@ firewall() {
         if ! vpsctl_firewall_install_nftables_conf; then
             return 1
         fi
-        if ! vpsctl_firewall_apply_nftables_conf; then
+        if ! vpsctl_firewall_reload_nftables; then
             return 1
         fi
-        systemctl reload-or-restart nftables
         std::tips::info "Remote nftables.conf refreshed"
         exit 0
     fi
@@ -83,17 +82,14 @@ firewall() {
         return 1
     fi
 
-    # 2. Apply initial configuration
-    if ! vpsctl_firewall_apply_nftables_conf; then
+    # 2. Enable and start nftables service
+    std::tips::title "Enabling and starting nftables service"
+    systemctl enable nftables
+    if ! vpsctl_firewall_reload_nftables; then
         return 1
     fi
 
-    # 3. Enable and start nftables service
-    std::tips::title "Enabling and starting nftables service"
-    systemctl enable nftables
-    systemctl restart nftables
-
-    # 4. Setup cron job for updates
+    # 3. Setup cron job for updates
     std::tips::title "Setting up automatic nftables refresh"
     local cron_job="0 2 * * * /usr/local/bin/vpsctl firewall --refresh-config &>>/tmp/vpsctl-firewall-cron.log"
     # Remove old cron job if it exists
